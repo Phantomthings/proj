@@ -699,8 +699,8 @@
                         <option value="between">Intervalle</option>
                     </select>
                 </div>
-                <div><input type="number" class="select-input" id="energy-min" placeholder="Min" step="0.001" onchange="onGlobalFiltersChange()"></div>
-                <div><input type="number" class="select-input" id="energy-max" placeholder="Max" step="0.001" onchange="onGlobalFiltersChange()"></div>
+                <div id="energy-min-wrap"><input type="number" class="select-input" id="energy-min" placeholder="Valeur min" step="0.001" onchange="onGlobalFiltersChange()"></div>
+                <div id="energy-max-wrap"><input type="number" class="select-input" id="energy-max" placeholder="Valeur max" step="0.001" onchange="onGlobalFiltersChange()"></div>
             </div>
 
             <div class="filter-row" style="align-items:flex-end;">
@@ -720,8 +720,8 @@
                         <option value="all">Tous</option><option value="lt">≤ valeur</option><option value="gt">≥ valeur</option><option value="between">Intervalle</option>
                     </select>
                 </div>
-                <div><input type="number" class="select-input" id="temp-min" placeholder="Min °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
-                <div><input type="number" class="select-input" id="temp-max" placeholder="Max °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
+                <div id="temp-min-wrap"><input type="number" class="select-input" id="temp-min" placeholder="Valeur min °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
+                <div id="temp-max-wrap"><input type="number" class="select-input" id="temp-max" placeholder="Valeur max °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
             </div>
 
             <div class="filter-row">
@@ -1047,6 +1047,43 @@
             document.getElementById('sum-dates').textContent = `${state.dateDebut} → ${state.dateFin}`;
         }
         
+
+        function updateRangeInputVisibility() {
+            const energyMode = document.getElementById('energy-mode')?.value || 'all';
+            const energyMinWrap = document.getElementById('energy-min-wrap');
+            const energyMaxWrap = document.getElementById('energy-max-wrap');
+            const energyMin = document.getElementById('energy-min');
+            const energyMax = document.getElementById('energy-max');
+
+            if (energyMinWrap && energyMaxWrap) {
+                energyMinWrap.style.display = (energyMode === 'gt' || energyMode === 'between') ? '' : 'none';
+                energyMaxWrap.style.display = (energyMode === 'lt' || energyMode === 'between') ? '' : 'none';
+            }
+            if (energyMode === 'lt' && energyMin) energyMin.value = '';
+            if (energyMode === 'gt' && energyMax) energyMax.value = '';
+            if (energyMode === 'all') {
+                if (energyMin) energyMin.value = '';
+                if (energyMax) energyMax.value = '';
+            }
+
+            const tempMode = document.getElementById('temp-mode')?.value || 'all';
+            const tempMinWrap = document.getElementById('temp-min-wrap');
+            const tempMaxWrap = document.getElementById('temp-max-wrap');
+            const tempMin = document.getElementById('temp-min');
+            const tempMax = document.getElementById('temp-max');
+
+            if (tempMinWrap && tempMaxWrap) {
+                tempMinWrap.style.display = (tempMode === 'gt' || tempMode === 'between') ? '' : 'none';
+                tempMaxWrap.style.display = (tempMode === 'lt' || tempMode === 'between') ? '' : 'none';
+            }
+            if (tempMode === 'lt' && tempMin) tempMin.value = '';
+            if (tempMode === 'gt' && tempMax) tempMax.value = '';
+            if (tempMode === 'all') {
+                if (tempMin) tempMin.value = '';
+                if (tempMax) tempMax.value = '';
+            }
+        }
+
         // Filters change
         async function onFiltersChange() {
             await loadFilterOptions();
@@ -1054,6 +1091,7 @@
         }
 
         function onGlobalFiltersChange() {
+            updateRangeInputVisibility();
             state.energyMode = document.getElementById('energy-mode')?.value || 'all';
             state.energyMin = document.getElementById('energy-min')?.value || '';
             state.energyMax = document.getElementById('energy-max')?.value || '';
@@ -1271,7 +1309,8 @@
             updateDates();
             await loadSites();
             await loadFilterOptions();
-            
+            updateRangeInputVisibility();
+
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tab === state.tab);
             });
