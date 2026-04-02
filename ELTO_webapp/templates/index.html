@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Erreurs de Charge</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/components/header.css">
+    <link rel="stylesheet" href="/static/css/components/filters.css">
+    <link rel="stylesheet" href="/static/css/components/tabs.css">
+    <link rel="stylesheet" href="/static/css/components/kpi-cards.css">
+    <link rel="stylesheet" href="/static/css/components/buttons.css">
+    <link rel="stylesheet" href="/static/css/components/charts.css">
+    <link rel="stylesheet" href="/static/css/components/cards.css">
+    <link rel="stylesheet" href="/static/css/pages/alertes.css">
+    <link rel="stylesheet" href="/static/css/pages/evolution.css">
+    <link rel="stylesheet" href="/static/css/pages/defauts-historique.css">
+    <link rel="stylesheet" href="/static/css/pages/multi-attempts.css">
+    <link rel="stylesheet" href="/static/css/pages/suspicious.css">
+    <link rel="stylesheet" href="/static/css/pages/report-generator.css">
+    <link rel="stylesheet" href="/static/css/pages/report.css">
+    <link rel="stylesheet" href="/static/css/pages/sessions-general.css">
+    <link rel="stylesheet" href="/static/css/pages/sessions_stats.css">
+    <link rel="stylesheet" href="/static/css/pages/sessions_comparaison.css">
+    <link rel="stylesheet" href="/static/css/pages/sessions_site_details.css">
+    <link rel="stylesheet" href="/static/css/pages/error_analysis.css">
+    <link rel="stylesheet" href="/static/css/pages/projection.css">
+    <link rel="stylesheet" href="/static/css/pages/code_analysis.css">
+    <link rel="stylesheet" href="/static/css/pages/code_results.css">
+    <link rel="stylesheet" href="/static/css/pages/mac-address.css">
+    <style>
+        /* Câbles de recharge coupés (PC08) */
+        .cables-card {
+            background: linear-gradient(135deg, #fff7ed, #ffedd5);
+            border: 1px solid #fed7aa;
+            border-radius: var(--radius);
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+        .cables-card summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            list-style: none;
+            color: #c2410c;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .cables-card summary::-webkit-details-marker { display: none; }
+        .cables-card summary::after {
+            content: '▼';
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+        .cables-card[open] summary::after { transform: rotate(180deg); }
+        .cables-card-body {
+            padding: 0.75rem 1rem;
+            border-top: 1px solid #fed7aa;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .cables-site-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #f97316;
+        }
+        .cables-site-row.recent { border-left-color: #dc2626; background: #fff5f5; }
+        .cables-site-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #9a3412;
+            min-width: 120px;
+        }
+        .cables-eqp-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+        .cables-eqp-tag {
+            padding: 0.15rem 0.5rem;
+            background: #ffedd5;
+            border: 1px solid #fed7aa;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #7c2d12;
+        }
+        .cables-eqp-tag.recent {
+            background: #fef2f2;
+            border-color: #fca5a5;
+            color: #b91c1c;
+            font-weight: 600;
+        }
+        .cables-recent-label {
+            font-weight: 700;
+            color: #dc2626;
+            animation: pulse-cables 1s ease-in-out infinite;
+        }
+        .cables-badge-new {
+            display: inline-block;
+            padding: 0.1rem 0.45rem;
+            background: #dc2626;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+            animation: pulse-cables 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-cables {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-logo">⚡ ELTO</div>
+        <div class="header-center">
+            <div class="header-title">Dashboard Erreurs de Charge</div>
+           <img src="/assets/nidec.png" alt="Nidec Logo" class="header-nidec-logo">
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="background: #f1f5f9; color: var(--color-text); border-radius: 16px; padding: 0.4rem 0.8rem; font-weight: 600; font-size: 0.9rem;">
+                👤 {{ user.username }}
+            </div>
+            <div>Mise à jour: <span id="update-time">--:--</span></div>
+            <button class="btn" id="logout-btn" type="button">Déconnexion</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <section class="filters">
+            <!-- Sites -->
+            <div class="filter-row">
+                <button class="btn" onclick="toggleAllSites()" id="btn-all-sites">☑ Tous les sites</button>
+                <div class="tags-box" id="sites-tags"></div>
+            </div>
+            
+            <!-- Période -->
+            <div class="filter-label">📅 Période d'analyse</div>
+            <div class="filter-row period-btns">
+                <button class="btn" data-mode="focus_jour" onclick="setDateMode('focus_jour')">Focus Jour</button>
+                <button class="btn active" data-mode="focus_mois" onclick="setDateMode('focus_mois')">Focus Mois</button>
+                <button class="btn" data-mode="j_minus_1" onclick="setDateMode('j_minus_1')">J-1 (Hier)</button>
+                <button class="btn" data-mode="semaine_minus_1" onclick="setDateMode('semaine_minus_1')">Semaine -1</button>
+                <button class="btn" data-mode="toute_periode" onclick="setDateMode('toute_periode')">Toute la période</button>
+                <button class="btn" data-mode="selection_manuelle" onclick="setDateMode('selection_manuelle')">Sélection manuelle</button>
+            </div>
+            
+            <!-- Month selector -->
+            <div class="filter-row month-selector" id="month-selector">
+                <div>
+                    <div class="filter-label">Année</div>
+                    <select class="select-input" id="year-select" onchange="updateDates()">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                <div>
+                    <div class="filter-label">Mois</div>
+                    <div class="month-radios" id="month-radios"></div>
+                </div>
+            </div>
+            
+            <!-- Day selector -->
+            <div class="filter-row" id="day-selector" style="display:none;">
+                <div>
+                    <div class="filter-label">Sélectionner une date</div>
+                    <input type="date" class="select-input" id="day-input" onchange="updateDates()">
+                </div>
+            </div>
+            
+            <!-- Manual date range selector -->
+            <div class="filter-row" id="manual-date-selector" style="display:none;">
+                <div>
+                    <div class="filter-label">Date de début</div>
+                    <input type="date" class="select-input" id="date-debut-input" onchange="updateDates()">
+                </div>
+                <div>
+                    <div class="filter-label">Date de fin</div>
+                    <input type="date" class="select-input" id="date-fin-input" onchange="updateDates()">
+                </div>
+            </div>
+            
+            <!-- Period summary -->
+            <div class="summary" id="period-summary">📅 Mois complet : December 2025</div>
+            
+            <!-- Global summary -->
+            <div class="summary-bar">
+                <span><strong>Période:</strong> <span id="sum-dates">--</span></span>
+                <span><strong>Sites:</strong> <span id="sum-sites">--</span></span>
+            </div>
+
+            <!-- Énergie + Température on same row -->
+            <div class="filter-row" style="align-items:flex-end; gap:0.5rem; flex-wrap:wrap;">
+                <div>
+                    <div class="filter-label">Énergie (kWh) - global</div>
+                    <select class="select-input" id="energy-mode" onchange="onEnergyFilterChange()" style="min-width:160px;">
+                        <option value="all">Tous</option>
+                        <option value="lt">≤ valeur</option>
+                        <option value="gt">≥ valeur</option>
+                        <option value="between">Intervalle</option>
+                    </select>
+                </div>
+                <div id="energy-min-group" style="display:none;">
+                    <div class="filter-label">Min</div>
+                    <input type="number" class="select-input" id="energy-min" step="0.001" placeholder="kWh" onchange="onEnergyFilterChange()" style="width:100px;">
+                </div>
+                <div id="energy-max-group" style="display:none;">
+                    <div class="filter-label">Max</div>
+                    <input type="number" class="select-input" id="energy-max" step="0.001" placeholder="kWh" onchange="onEnergyFilterChange()" style="width:100px;">
+                </div>
+
+                <div style="width:1px; background:var(--color-border,#e2e8f0); align-self:stretch; margin:0 0.25rem;"></div>
+
+                <div>
+                    <div class="filter-label">Température - global</div>
+                    <select class="select-input" id="temp-column" onchange="onTempFilterChange()" style="min-width:200px;">
+                        <option value="">-- Colonne --</option>
+                        <optgroup label="DCBM Temp H">
+                            <option value="DCBM_Temp_H_Min">DCBM_Temp_H_Min</option>
+                            <option value="DCBM_Temp_H_Max">DCBM_Temp_H_Max</option>
+                            <option value="DCBM_Temp_H_Moy">DCBM_Temp_H_Moy</option>
+                        </optgroup>
+                        <optgroup label="DCBM Temp L">
+                            <option value="DCBM_Temp_L_Min">DCBM_Temp_L_Min</option>
+                            <option value="DCBM_Temp_L_Max">DCBM_Temp_L_Max</option>
+                            <option value="DCBM_Temp_L_Moy">DCBM_Temp_L_Moy</option>
+                        </optgroup>
+                        <optgroup label="Pistolet Temp 1">
+                            <option value="PISTOLET_Temp_1_Min">PISTOLET_Temp_1_Min</option>
+                            <option value="PISTOLET_Temp_1_Max">PISTOLET_Temp_1_Max</option>
+                            <option value="PISTOLET_Temp_1_Moy">PISTOLET_Temp_1_Moy</option>
+                        </optgroup>
+                        <optgroup label="Pistolet Temp 2">
+                            <option value="PISTOLET_Temp_2_Min">PISTOLET_Temp_2_Min</option>
+                            <option value="PISTOLET_Temp_2_Max">PISTOLET_Temp_2_Max</option>
+                            <option value="PISTOLET_Temp_2_Moy">PISTOLET_Temp_2_Moy</option>
+                        </optgroup>
+                        <optgroup label="Différences">
+                            <option value="DCBM_Temp_Moy_Diff">DCBM_Temp_Moy_Diff</option>
+                            <option value="PISTOLET_Temp_Moy_Diff">PISTOLET_Temp_Moy_Diff</option>
+                            <option value="DCBM_PISTOLET_Moy_Diff">DCBM_PISTOLET_Moy_Diff</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div id="temp-mode-group" style="display:none;">
+                    <div class="filter-label">Mode</div>
+                    <select class="select-input" id="temp-mode" onchange="onTempFilterChange()" style="min-width:130px;">
+                        <option value="all">Tous</option>
+                        <option value="lt">&le; valeur</option>
+                        <option value="gt">&ge; valeur</option>
+                        <option value="between">Intervalle</option>
+                    </select>
+                </div>
+                <div id="temp-min-group" style="display:none;">
+                    <div class="filter-label">Min (&deg;C)</div>
+                    <input type="number" class="select-input" id="temp-min" step="0.1" placeholder="&deg;C" onchange="onTempFilterChange()" style="width:90px;">
+                </div>
+                <div id="temp-max-group" style="display:none;">
+                    <div class="filter-label">Max (&deg;C)</div>
+                    <input type="number" class="select-input" id="temp-max" step="0.1" placeholder="&deg;C" onchange="onTempFilterChange()" style="width:90px;">
+                </div>
+            </div>
+
+            <!-- Warning filter -->
+            <div class="filter-row" style="align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
+                <div>
+                    <div class="filter-label">Warnings - global</div>
+                    <div id="warning-tags" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.25rem;">
+                        <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.7rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em;">Fin de charge</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                                <label class="warning-tag" title="Fin de charge" data-code="1"><input type="checkbox" value="1" onchange="onWarningFilterChange()"> <span>1 — Fin de charge</span></label>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.7rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em;">DCBM</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                                <label class="warning-tag" title="DCBM_Temp_H_Max > 50" data-code="2"><input type="checkbox" value="2" onchange="onWarningFilterChange()"> <span>2 — Temp_H_Max &gt; 50°C</span></label>
+                                <label class="warning-tag" title="DCBM_Temp_H_Moy > 65" data-code="3"><input type="checkbox" value="3" onchange="onWarningFilterChange()"> <span>3 — Temp_H_Moy &gt; 65°C</span></label>
+                                <label class="warning-tag" title="DCBM_Temp_L_Max > 50" data-code="4"><input type="checkbox" value="4" onchange="onWarningFilterChange()"> <span>4 — Temp_L_Max &gt; 50°C</span></label>
+                                <label class="warning-tag" title="DCBM_Temp_L_Moy > 65" data-code="5"><input type="checkbox" value="5" onchange="onWarningFilterChange()"> <span>5 — Temp_L_Moy &gt; 65°C</span></label>
+                                <label class="warning-tag" title="DCBM_Temp_Moy_Diff > 10" data-code="11"><input type="checkbox" value="11" onchange="onWarningFilterChange()"> <span>11 — Temp_Moy_Diff &gt; 10°C</span></label>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.7rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em;">Pistolet</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                                <label class="warning-tag" title="PISTOLET_Temp_1_Max > 70" data-code="6"><input type="checkbox" value="6" onchange="onWarningFilterChange()"> <span>6 — P1_Max &gt; 70°C</span></label>
+                                <label class="warning-tag" title="PISTOLET_Temp_1_Moy > 65" data-code="7"><input type="checkbox" value="7" onchange="onWarningFilterChange()"> <span>7 — P1_Moy &gt; 65°C</span></label>
+                                <label class="warning-tag" title="PISTOLET_Temp_2_Max > 70" data-code="8"><input type="checkbox" value="8" onchange="onWarningFilterChange()"> <span>8 — P2_Max &gt; 70°C</span></label>
+                                <label class="warning-tag" title="PISTOLET_Temp_2_Moy > 65" data-code="9"><input type="checkbox" value="9" onchange="onWarningFilterChange()"> <span>9 — P2_Moy &gt; 65°C</span></label>
+                                <label class="warning-tag" title="PISTOLET_Temp_Moy_Diff > 10" data-code="10"><input type="checkbox" value="10" onchange="onWarningFilterChange()"> <span>10 — P_Moy_Diff &gt; 10°C</span></label>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.7rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:.04em;">Delta</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.3rem;">
+                                <label class="warning-tag" title="DCBM_PISTOLET_Moy_Diff > 25" data-code="12"><input type="checkbox" value="12" onchange="onWarningFilterChange()"> <span>12 — DCBM↔Pistolet &gt; 25°C</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error filters -->
+            <div class="filter-row-errors">
+                <div>
+                    <div class="filter-label">Type d'erreur (global)</div>
+                    <div class="tags-box" id="error-type-tags"></div>
+                </div>
+                <div>
+                    <div class="filter-label">Moment d'erreur</div>
+                    <div class="tags-box" id="moment-tags"></div>
+                </div>
+                <div class="toggles">
+                    <div class="toggle-row">
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-avant" checked onchange="onToggle()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label">⚡ Avant charge</span>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle">
+                            <input type="checkbox" id="toggle-charge" checked onchange="onToggle()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label">🔋 Charge</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tabs-section">
+            <div class="tabs-nav">
+                <a href="/dashboard/overview" class="tab-btn active" data-tab="overview">📊 Vue d'ensemble</a>
+                <a href="/dashboard/general" class="tab-btn" data-tab="general">📋 Générale</a>
+                <a href="/dashboard/details-site" class="tab-btn" data-tab="details-site">🔌 Détails Site</a>
+                <a href="/dashboard/comparaison" class="tab-btn" data-tab="comparaison">🏢 Comparaison</a>
+                <a href="/dashboard/stats" class="tab-btn" data-tab="stats">📈 Statistiques</a>
+                <a href="/dashboard/analyse-erreur" class="tab-btn" data-tab="analyse-erreur">🔍 Analyse Erreur</a>
+                <a href="/dashboard/code-analysis" class="tab-btn" data-tab="code-analysis">🔍 Codes</a>
+                <a href="/dashboard/projection" class="tab-btn" data-tab="projection">📑 Projection</a>
+                <a href="/dashboard/mac-address" class="tab-btn" data-tab="mac-address">🔐 MAC Address</a>
+                <a href="/dashboard/tentatives" class="tab-btn" data-tab="tentatives">⚠️ Multi-tentatives</a>
+                <a href="/dashboard/suspectes" class="tab-btn" data-tab="suspectes">⚠️ Transactions < 1 kWh</a>
+                <a href="/dashboard/alertes" class="tab-btn" data-tab="alertes">⚠️ Erreurs récurrentes</a>
+                <a href="/dashboard/evolution" class="tab-btn" data-tab="evolution">📈 Evolution</a>
+                <a href="/dashboard/historique" class="tab-btn" data-tab="historique">📋 Historique défauts</a>
+                <a href="/dashboard/rapport" class="tab-btn" data-tab="rapport">📄 Rapport Client</a>
+            </div>
+            <div id="tab-content">
+                <div class="loading"><span class="spinner"></span> Chargement...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // State
+        const state = {
+            tab: '{{ initial_tab|default("overview") }}',
+            dateMode: 'focus_mois',
+            dateDebut: null,
+            dateFin: null,
+            allSites: [],
+            sites: [],
+            projectionSites: [],
+            projectionHideEmpty: false,
+            errorTypes: [],
+            selectedErrorTypes: [],
+            moments: [],
+            selectedMoments: [],
+            siteFocus: '',
+            siteDetailsPdcs: [],
+            macSearchState: null,
+            codeAnalysisState: null,
+            energyMode: 'all',
+            energyMin: '',
+            energyMax: '',
+            tempColumn: '',
+            tempMode: 'all',
+            tempMin: '',
+            tempMax: '',
+            selectedWarnings: [],
+        };
+
+        const MOMENT_GROUPS = {
+            avant: ['Init', 'Lock Connector', 'CableCheck'],
+            charge: ['Charge'],
+        };
+        
+        const endpoints = {
+            'overview': '/api/tab/overview',
+            'general': '/api/sessions/general',
+            'comparaison': '/api/sessions/comparaison',
+            'details-site': '/api/sessions/site-details',
+            'stats': '/api/sessions/stats',
+            'analyse-erreur': '/api/sessions/error-analysis',
+            'rapport': '/api/report',
+            'code-analysis': '/api/mac-address/code-analysis',
+            'projection': '/api/sessions/projection',
+            'mac-address': '/api/mac-address',
+            'tentatives': '/api/kpi/multi-attempts',
+            'suspectes': '/api/kpi/suspicious',
+            'alertes': '/api/alertes',
+            'evolution': '/api/kpi/evolution',
+            'historique': '/api/defauts-historique',
+            'rapport': '/api/report',
+        };
+        
+        // Init month radios
+        const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc'];
+        document.getElementById('month-radios').innerHTML = months.map((m, i) => 
+            `<label class="month-radio"><input type="radio" name="month" value="${i+1}" ${i+1 === new Date().getMonth()+1 ? 'checked' : ''} onchange="updateDates()"> ${m}</label>`
+        ).join('');
+        
+        // Load sites
+        async function loadSites() {
+            const res = await fetch('/api/filters/sites');
+            const data = await res.json();
+            state.allSites = data.sites || [];
+            state.sites = [...state.allSites];
+            if (!state.siteFocus && state.allSites.length) {
+                state.siteFocus = state.allSites[0];
+            }
+            renderSites();
+        }
+        
+        function renderSites() {
+            document.getElementById('sites-tags').innerHTML = state.allSites.map(s => {
+                const isSelected = state.sites.includes(s);
+                return `<span class="tag ${isSelected ? '' : 'inactive'}" onclick="toggleSite('${s}')">${s} <button class="tag-remove" onclick="event.stopPropagation(); toggleSite('${s}')">${isSelected ? '×' : '+'}</button></span>`;
+            }).join('');
+            document.getElementById('btn-all-sites').textContent = 
+                state.sites.length === state.allSites.length ? '☑ Tous les sites' : '☐ Tous les sites';
+            document.getElementById('sum-sites').textContent = state.sites.length;
+        }
+        
+        function toggleAllSites() {
+            state.sites = state.sites.length === state.allSites.length ? [] : [...state.allSites];
+            renderSites();
+            onFiltersChange();
+        }
+        
+        function toggleSite(site) {
+            if (state.sites.includes(site)) {
+                state.sites = state.sites.filter(s => s !== site);
+            } else {
+                state.sites = [...state.sites, site].sort((a, b) => {
+                    const idxA = state.allSites.indexOf(a);
+                    const idxB = state.allSites.indexOf(b);
+                    return idxA - idxB;
+                });
+            }
+            renderSites();
+            onFiltersChange();
+        }
+        
+        // Garder removeSite pour compatibilité si utilisé ailleurs
+        function removeSite(site) {
+            toggleSite(site);
+        }
+        
+        // Load filter options
+        async function loadFilterOptions() {
+            const params = new URLSearchParams();
+            if (state.sites.length < state.allSites.length) params.set('sites', state.sites.join(','));
+            if (state.dateDebut) params.set('date_debut', state.dateDebut);
+            if (state.dateFin) params.set('date_fin', state.dateFin);
+            
+            const res = await fetch(`/api/filters/options?${params}`);
+            const data = await res.json();
+            
+            state.errorTypes = data.error_types || [];
+            state.moments = data.moments || [];
+            
+            if (!state.selectedErrorTypes.length) state.selectedErrorTypes = [...state.errorTypes];
+            else state.selectedErrorTypes = state.selectedErrorTypes.filter(t => state.errorTypes.includes(t));
+            
+            if (!state.selectedMoments.length) state.selectedMoments = [...state.moments];
+            else state.selectedMoments = state.selectedMoments.filter(m => state.moments.includes(m));
+            
+            renderErrorTypes();
+            renderMoments();
+            updateToggles();
+        }
+        
+        function renderErrorTypes() {
+            document.getElementById('error-type-tags').innerHTML = state.errorTypes.map(t => {
+                const isSelected = state.selectedErrorTypes.includes(t);
+                const label = t.length > 18 ? t.slice(0, 18) + '...' : t;
+                return `<span class="tag ${isSelected ? '' : 'inactive'}" onclick="toggleErrorType('${t}')">${label} <button class="tag-remove" onclick="event.stopPropagation(); toggleErrorType('${t}')">${isSelected ? '×' : '+'}</button></span>`;
+            }).join('');
+        }
+
+        function toggleErrorType(type) {
+            if (state.selectedErrorTypes.includes(type)) {
+                state.selectedErrorTypes = state.selectedErrorTypes.filter(t => t !== type);
+            } else {
+                state.selectedErrorTypes = [...state.selectedErrorTypes, type];
+            }
+            renderErrorTypes();
+            refreshTab();
+        }
+
+        function renderMoments() {
+            document.getElementById('moment-tags').innerHTML = state.moments.map(m => {
+                const isSelected = state.selectedMoments.includes(m);
+                return `<span class="tag ${isSelected ? '' : 'inactive'}" onclick="toggleMoment('${m}')">${m} <button class="tag-remove" onclick="event.stopPropagation(); toggleMoment('${m}')">${isSelected ? '×' : '+'}</button></span>`;
+            }).join('');
+        }
+
+        function toggleMoment(moment) {
+            if (state.selectedMoments.includes(moment)) {
+                state.selectedMoments = state.selectedMoments.filter(m => m !== moment);
+            } else {
+                state.selectedMoments = [...state.selectedMoments, moment];
+            }
+            renderMoments();
+            updateToggles();
+            refreshTab();
+        }
+        
+        function onToggle() {
+            let newMoments = [];
+            if (document.getElementById('toggle-avant').checked) 
+                newMoments.push(...MOMENT_GROUPS.avant.filter(m => state.moments.includes(m)));
+            if (document.getElementById('toggle-charge').checked) 
+                newMoments.push(...MOMENT_GROUPS.charge.filter(m => state.moments.includes(m)));
+            if (state.moments.includes('Unknown')) newMoments.push('Unknown');
+            
+            state.selectedMoments = newMoments;
+            renderMoments();
+            refreshTab();
+        }
+        
+        function updateToggles() {
+            const hasAvant = MOMENT_GROUPS.avant.every(m => !state.moments.includes(m) || state.selectedMoments.includes(m));
+            const hasCharge = !state.moments.includes('Charge') || state.selectedMoments.includes('Charge');
+            document.getElementById('toggle-avant').checked = hasAvant;
+            document.getElementById('toggle-charge').checked = hasCharge;
+        }
+        
+        // Dates
+        function setDateMode(mode) {
+            state.dateMode = mode;
+            document.querySelectorAll('.period-btns .btn').forEach(b => 
+                b.classList.toggle('active', b.dataset.mode === mode));
+            document.getElementById('month-selector').style.display = mode === 'focus_mois' ? 'flex' : 'none';
+            document.getElementById('day-selector').style.display = mode === 'focus_jour' ? 'block' : 'none';
+            document.getElementById('manual-date-selector').style.display = mode === 'selection_manuelle' ? 'flex' : 'none';
+            
+            // Initialiser les dates par défaut pour la sélection manuelle si elles sont vides
+            if (mode === 'selection_manuelle') {
+                const dateDebutInput = document.getElementById('date-debut-input');
+                const dateFinInput = document.getElementById('date-fin-input');
+                if (!dateDebutInput.value) {
+                    const today = new Date();
+                    dateDebutInput.value = fmt(today);
+                }
+                if (!dateFinInput.value) {
+                    const today = new Date();
+                    dateFinInput.value = fmt(today);
+                }
+            }
+            
+            updateDates();
+        }
+        
+        function updateDates() {
+            const today = new Date();
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            
+            switch(state.dateMode) {
+                case 'focus_jour':
+                    const day = document.getElementById('day-input').value || fmt(today);
+                    state.dateDebut = state.dateFin = day;
+                    break;
+                case 'focus_mois':
+                    const year = document.getElementById('year-select').value;
+                    const month = document.querySelector('input[name="month"]:checked')?.value || today.getMonth()+1;
+                    const first = new Date(year, month-1, 1);
+                    const last = new Date(year, month, 0);
+                    state.dateDebut = fmt(first);
+                    state.dateFin = fmt(last);
+                    break;
+                case 'j_minus_1':
+                    state.dateDebut = state.dateFin = fmt(yesterday);
+                    break;
+                case 'semaine_minus_1':
+                    const week = new Date(yesterday); week.setDate(week.getDate() - 6);
+                    state.dateDebut = fmt(week);
+                    state.dateFin = fmt(yesterday);
+                    break;
+                case 'toute_periode':
+                    state.dateDebut = '{{ date_min }}';
+                    state.dateFin = '{{ date_max }}';
+                    break;
+                case 'selection_manuelle':
+                    const dateDebutInput = document.getElementById('date-debut-input');
+                    const dateFinInput = document.getElementById('date-fin-input');
+                    state.dateDebut = dateDebutInput.value || fmt(today);
+                    state.dateFin = dateFinInput.value || fmt(today);
+                    break;
+            }
+            updateSummary();
+            onFiltersChange();
+        }
+        
+        function fmt(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        function updateSummary() {
+            const monthNames = [
+            'Janvier',
+            'Février',
+            'Mars',
+            'Avril',
+            'Mai',
+            'Juin',
+            'Juillet',
+            'Août',
+            'Septembre',
+            'Octobre',
+            'Novembre',
+            'Décembre'
+            ];
+            const year = document.getElementById('year-select').value;
+            const month = document.querySelector('input[name="month"]:checked')?.value || new Date().getMonth()+1;
+            
+            let text = '';
+            switch(state.dateMode) {
+                case 'focus_jour': text = `📅 Focus Jour : ${state.dateDebut}`; break;
+                case 'focus_mois': text = `📅 Mois complet : ${monthNames[month-1]} ${year}`; break;
+                case 'j_minus_1': text = `📅 J-1 (hier) : ${state.dateDebut}`; break;
+                case 'semaine_minus_1': text = `📅 Semaine -1 : ${state.dateDebut} → ${state.dateFin}`; break;
+                case 'toute_periode': text = `📅 Toute la période : ${state.dateDebut} → ${state.dateFin}`; break;
+                case 'selection_manuelle': text = `📅 Sélection manuelle : ${state.dateDebut} → ${state.dateFin}`; break;
+            }
+            document.getElementById('period-summary').textContent = text;
+            document.getElementById('sum-dates').textContent = `${state.dateDebut} → ${state.dateFin}`;
+        }
+
+        function updateEnergyFilterInputs() {
+            const mode = document.getElementById('energy-mode')?.value || 'all';
+            const minGroup = document.getElementById('energy-min-group');
+            const maxGroup = document.getElementById('energy-max-group');
+            const minInput = document.getElementById('energy-min');
+            const maxInput = document.getElementById('energy-max');
+            if (!minGroup || !maxGroup || !minInput || !maxInput) return;
+
+            if (mode === 'between') {
+                minGroup.style.display = '';
+                maxGroup.style.display = '';
+                minInput.placeholder = 'kWh min';
+                maxInput.placeholder = 'kWh max';
+            } else if (mode === 'gt') {
+                minGroup.style.display = '';
+                maxGroup.style.display = 'none';
+                maxInput.value = '';
+                minInput.placeholder = 'kWh min';
+            } else if (mode === 'lt') {
+                minGroup.style.display = 'none';
+                maxGroup.style.display = '';
+                minInput.value = '';
+                maxInput.placeholder = 'kWh max';
+            } else {
+                minGroup.style.display = 'none';
+                maxGroup.style.display = 'none';
+                minInput.value = '';
+                maxInput.value = '';
+            }
+        }
+
+        function onEnergyFilterChange() {
+            state.energyMode = document.getElementById('energy-mode')?.value || 'all';
+            state.energyMin = (document.getElementById('energy-min')?.value || '').trim();
+            state.energyMax = (document.getElementById('energy-max')?.value || '').trim();
+            updateEnergyFilterInputs();
+            refreshTab();
+        }
+
+        function updateTempFilterInputs() {
+            const col = document.getElementById('temp-column')?.value || '';
+            const mode = document.getElementById('temp-mode')?.value || 'all';
+            const modeGroup = document.getElementById('temp-mode-group');
+            const minGroup = document.getElementById('temp-min-group');
+            const maxGroup = document.getElementById('temp-max-group');
+            const minInput = document.getElementById('temp-min');
+            const maxInput = document.getElementById('temp-max');
+            if (!modeGroup || !minGroup || !maxGroup || !minInput || !maxInput) return;
+
+            if (!col) {
+                modeGroup.style.display = 'none';
+                minGroup.style.display = 'none';
+                maxGroup.style.display = 'none';
+                minInput.value = '';
+                maxInput.value = '';
+                return;
+            }
+            modeGroup.style.display = '';
+
+            if (mode === 'between') {
+                minGroup.style.display = '';
+                maxGroup.style.display = '';
+            } else if (mode === 'gt') {
+                minGroup.style.display = '';
+                maxGroup.style.display = 'none';
+                maxInput.value = '';
+            } else if (mode === 'lt') {
+                minGroup.style.display = 'none';
+                maxGroup.style.display = '';
+                minInput.value = '';
+            } else {
+                minGroup.style.display = 'none';
+                maxGroup.style.display = 'none';
+                minInput.value = '';
+                maxInput.value = '';
+            }
+        }
+
+        function onTempFilterChange() {
+            state.tempColumn = document.getElementById('temp-column')?.value || '';
+            state.tempMode = document.getElementById('temp-mode')?.value || 'all';
+            state.tempMin = (document.getElementById('temp-min')?.value || '').trim();
+            state.tempMax = (document.getElementById('temp-max')?.value || '').trim();
+            if (!state.tempColumn) {
+                state.tempMode = 'all';
+                state.tempMin = '';
+                state.tempMax = '';
+            }
+            updateTempFilterInputs();
+            refreshTab();
+        }
+
+        function onWarningFilterChange() {
+            const checked = Array.from(document.querySelectorAll('#warning-tags input[type="checkbox"]:checked'));
+            state.selectedWarnings = checked.map(el => el.value);
+            refreshTab();
+        }
+
+        // Filters change
+        async function onFiltersChange() {
+            try {
+                await loadFilterOptions();
+            } catch (e) {
+                console.warn('loadFilterOptions failed:', e);
+            }
+            refreshTab();
+        }
+
+        // Tabs
+        function buildUrl(base) {
+            const p = new URLSearchParams();
+            if (state.tab === 'projection') {
+                if (state.projectionSites.length) p.set('sites', state.projectionSites.join(','));
+                if (state.projectionHideEmpty) p.set('hide_empty', 'true');
+            } else {
+                if (state.sites.length && state.sites.length < state.allSites.length) p.set('sites', state.sites.join(','));
+            }
+            if (state.tab === 'details-site' && state.siteFocus) {
+                p.set('site_focus', state.siteFocus);
+                if (state.siteDetailsPdcs.length) {
+                    p.set('pdc', state.siteDetailsPdcs.join(','));
+                }
+            }
+            if (state.dateDebut) p.set('date_debut', state.dateDebut);
+            if (state.dateFin) p.set('date_fin', state.dateFin);
+            if (state.selectedErrorTypes.length < state.errorTypes.length) p.set('error_types', state.selectedErrorTypes.join(','));
+            if (state.selectedMoments.length < state.moments.length) p.set('moments', state.selectedMoments.join(','));
+            if (state.energyMode && state.energyMode !== 'all') p.set('energy_mode', state.energyMode);
+            if (state.energyMin) p.set('energy_min', state.energyMin);
+            if (state.energyMax) p.set('energy_max', state.energyMax);
+            if (state.tempColumn) p.set('temp_column', state.tempColumn);
+            if (state.tempMode && state.tempMode !== 'all') p.set('temp_mode', state.tempMode);
+            if (state.tempMin) p.set('temp_min', state.tempMin);
+            if (state.tempMax) p.set('temp_max', state.tempMax);
+            if (state.selectedWarnings && state.selectedWarnings.length) p.set('warnings', state.selectedWarnings.join(','));
+
+            return p.toString() ? `${base}?${p}` : base;
+        }
+
+        function captureTabState() {
+            if (state.tab === 'details-site') {
+                const pdcCheckboxes = Array.from(document.querySelectorAll('input[name="pdc-option"]:checked'));
+                state.siteDetailsPdcs = pdcCheckboxes.map(el => el.value);
+                const siteSelect = document.getElementById('site-focus');
+                if (siteSelect && siteSelect.value) {
+                    state.siteFocus = siteSelect.value;
+                }
+            }
+
+            if (state.tab === 'mac-address') {
+                const macInput = document.querySelector('input[name="mac_query"]');
+                if (macInput) {
+                    state.macSearchState = {
+                        ...(state.macSearchState || {}),
+                        mac_query: macInput.value.trim(),
+                    };
+                }
+            }
+
+            if (state.tab === 'code-analysis') {
+                const codeForm = document.querySelector('.code-form');
+                if (codeForm) {
+                    const codes = codeForm.querySelector('input[name="codes"]')?.value.trim() || '';
+                    const codeType = codeForm.querySelector('select[name="code_type"]')?.value || 'Tous';
+                    state.codeAnalysisState = {
+                        ...(state.codeAnalysisState || {}),
+                        codes,
+                        code_type: codeType,
+                    };
+                }
+            }
+        }
+
+        function restoreTabState() {
+            if (state.tab === 'details-site' && state.siteDetailsPdcs.length) {
+                const pdcCheckboxes = Array.from(document.querySelectorAll('input[name="pdc-option"]'));
+                if (pdcCheckboxes.length) {
+                    const pdcSet = new Set(state.siteDetailsPdcs);
+                    pdcCheckboxes.forEach(cb => { cb.checked = pdcSet.has(cb.value); });
+                    const toggle = document.getElementById('pdc-toggle');
+                    if (toggle) {
+                        const allChecked = pdcCheckboxes.every(cb => cb.checked);
+                        toggle.textContent = allChecked ? '☑ Tous' : '☐ Tous';
+                    }
+                }
+            }
+
+            if (state.tab === 'mac-address' && state.macSearchState) {
+                const macInput = document.querySelector('input[name="mac_query"]');
+                if (macInput) {
+                    macInput.value = state.macSearchState.mac_query || '';
+                    if (state.macSearchState.submitted && state.macSearchState.mac_query) {
+                        const form = macInput.closest('form');
+                        if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                }
+            }
+
+            if (state.tab === 'code-analysis' && state.codeAnalysisState) {
+                const codeForm = document.querySelector('.code-form');
+                if (codeForm) {
+                    const codesInput = codeForm.querySelector('input[name="codes"]');
+                    const typeSelect = codeForm.querySelector('select[name="code_type"]');
+                    if (codesInput) codesInput.value = state.codeAnalysisState.codes || '';
+                    if (typeSelect) typeSelect.value = state.codeAnalysisState.code_type || 'Tous';
+                    if (state.codeAnalysisState.submitted && state.codeAnalysisState.codes) {
+                        codeForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                }
+            }
+        }
+
+        function updateProjectionSelection(selected, silent = false) {
+            state.projectionSites = selected || [];
+            if (!silent && state.tab === 'projection' && state.projectionSites.length) refreshTab();
+        }
+
+        function updateProjectionHideEmpty(value, silent = false) {
+            state.projectionHideEmpty = !!value;
+            if (!silent && state.tab === 'projection' && state.projectionSites.length) refreshTab();
+        }
+
+        function refreshTab() {
+            captureTabState();
+            const tabContent = document.getElementById('tab-content');
+            if (tabContent) {
+                tabContent.innerHTML = `<div class="loading"><span class="spinner"></span> Chargement...</div>`;
+            }
+            const url = buildUrl(endpoints[state.tab]);
+            
+            // Met à jour l'URL dans la barre d'adresse
+            const dashboardUrl = `/dashboard/${state.tab}`;
+            window.history.pushState({tab: state.tab}, '', dashboardUrl);
+            
+            // Charge le contenu
+            htmx.ajax('GET', url, {target: '#tab-content', swap: 'innerHTML'});
+        }
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault(); 
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.tab = btn.dataset.tab;
+                refreshTab();
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            const navTarget = event.target.closest('[data-nav-tab]');
+            if (navTarget) {
+                const tab = navTarget.dataset.navTab;
+                if (navTarget.dataset.siteFocus) {
+                    state.siteFocus = navTarget.dataset.siteFocus;
+                }
+                const tabBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+                if (tabBtn) {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    tabBtn.classList.add('active');
+                    state.tab = tab;
+                    refreshTab();
+                }
+            }
+        });
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (form.classList.contains('mac-search-form')) {
+                const macInput = form.querySelector('input[name="mac_query"]');
+                state.macSearchState = {
+                    mac_query: macInput?.value.trim() || '',
+                    submitted: true,
+                };
+            }
+            if (form.classList.contains('code-form')) {
+                const codes = form.querySelector('input[name="codes"]')?.value.trim() || '';
+                const codeType = form.querySelector('select[name="code_type"]')?.value || 'Tous';
+                state.codeAnalysisState = {
+                    codes,
+                    code_type: codeType,
+                    submitted: true,
+                };
+            }
+        });
+
+        document.addEventListener('change', (event) => {
+            if (event.target.id === 'site-focus') {
+                state.siteFocus = event.target.value;
+            }
+            if (event.target.name === 'pdc-option') {
+                const checked = Array.from(document.querySelectorAll('input[name="pdc-option"]:checked')).map(el => el.value);
+                state.siteDetailsPdcs = checked;
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            if (event.target && event.target.id === 'tab-content') {
+                restoreTabState();
+            }
+        });
+
+        // Inject global filter state into every HTMX GET request to /api/
+        // This ensures local tab actions (site change, month, day, MAC search…)
+        // always carry the current global filters (energy, temperature, warnings).
+        document.body.addEventListener('htmx:configRequest', (evt) => {
+            if (evt.detail.verb !== 'get') return;
+            var path = evt.detail.path || '';
+            if (!path.startsWith('/api/')) return;
+
+            // Parse params already in the URL to avoid duplicates
+            var existing = new URLSearchParams(path.includes('?') ? path.split('?')[1] : '');
+            var p = evt.detail.parameters;
+
+            // Energy filter
+            if (state.energyMode && state.energyMode !== 'all' && !existing.has('energy_mode') && !p['energy_mode']) {
+                p['energy_mode'] = state.energyMode;
+                if (state.energyMin) p['energy_min'] = state.energyMin;
+                if (state.energyMax) p['energy_max'] = state.energyMax;
+            }
+
+            // Temperature filter
+            if (state.tempColumn && !existing.has('temp_column') && !p['temp_column']) {
+                p['temp_column'] = state.tempColumn;
+                if (state.tempMode && state.tempMode !== 'all') p['temp_mode'] = state.tempMode;
+                if (state.tempMin) p['temp_min'] = state.tempMin;
+                if (state.tempMax) p['temp_max'] = state.tempMax;
+            }
+
+            // Warning filter
+            if (state.selectedWarnings && state.selectedWarnings.length && !existing.has('warnings') && !p['warnings']) {
+                p['warnings'] = state.selectedWarnings.join(',');
+            }
+        });
+        
+        // Time
+        function updateTime() {
+            document.getElementById('update-time').textContent = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+        }
+        
+        // Init
+        async function init() {
+            document.getElementById('year-select').value = new Date().getFullYear();
+            document.getElementById('day-input').value = fmt(new Date());
+            updateEnergyFilterInputs();
+            updateDates();
+            await loadSites();
+            await loadFilterOptions();
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === state.tab);
+            });
+            
+            refreshTab();
+            updateTime();
+            setInterval(updateTime, 60000);
+        }
+        
+        init();
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    await fetch('/logout', { method: 'POST' });
+                } finally {
+                    window.location.href = '/';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
