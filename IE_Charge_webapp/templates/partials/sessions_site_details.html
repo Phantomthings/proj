@@ -350,12 +350,13 @@
                         <th class="sortable">MAC</th>
                         <th class="sortable">Véhicule</th>
                         <th class="sortable" data-type="number">Évolution SOC</th>
+                        <th class="sortable">Warning</th>
                         <th>Lien</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in ok_rows %}
-                    <tr{% if row['warning'] == 1 %} style="background-color: #fefce8;"{% endif %}>
+                    <tr{% if row.get('has_warning') %} style="background-color: #fefce8;"{% endif %}>
                         <td>{{ loop.index }}</td>
                         <td>{{ row['ID'] }}</td>
                         <td>{{ row['Datetime start'] }}</td>
@@ -368,6 +369,13 @@
                         <td class="mac-code">{{ row['MAC Address'] }}</td>
                         <td>{{ row['Vehicle'] or '—' }}</td>
                         <td style="text-align:right;">{{ row['evolution_soc'] }}</td>
+                        <td data-sort-value="{{ row.get('warning_codes_list', [])|join(',') }}">
+                            {% if row.get('has_warning') %}
+                            <details><summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ row.get('warning_codes_list', [])|join(', ') }}</summary>
+                                <div style="font-size:0.8rem; color:#92400e;">{% for d in row.get('warning_details_list', []) %}<div>{{ d }}</div>{% endfor %}</div>
+                            </details>
+                            {% else %}—{% endif %}
+                        </td>
                         <td style="text-align:center;">
                             {% if row['elto'] %}<a href="{{ row['elto'] }}" target="_blank" class="mac-link">Ouvrir</a>{% endif %}
                         </td>
@@ -401,12 +409,13 @@
                         <th class="sortable">Erreur</th>
                         <th class="sortable">Moment</th>
                         <th class="sortable" data-type="number">Évolution SOC</th>
+                        <th class="sortable">Warning</th>
                         <th>Lien</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in err_rows %}
-                    <tr{% if row['warning'] == 1 %} style="background-color: #fefce8;"{% endif %}>
+                    <tr{% if row.get('has_warning') %} style="background-color: #fefce8;"{% endif %}>
                         <td>{{ loop.index }}</td>
                         <td>{{ row['ID'] }}</td>
                         <td>{{ row['Datetime start'] }}</td>
@@ -421,6 +430,13 @@
                         <td style="color:#dc2626; font-weight:500;">{{ row['type_erreur'] }}</td>
                         <td>{{ row['moment'] }}</td>
                         <td style="text-align:right;">{{ row['evolution_soc'] }}</td>
+                        <td data-sort-value="{{ row.get('warning_codes_list', [])|join(',') }}">
+                            {% if row.get('has_warning') %}
+                            <details><summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ row.get('warning_codes_list', [])|join(', ') }}</summary>
+                                <div style="font-size:0.8rem; color:#92400e;">{% for d in row.get('warning_details_list', []) %}<div>{{ d }}</div>{% endfor %}</div>
+                            </details>
+                            {% else %}—{% endif %}
+                        </td>
                         <td style="text-align:center;">
                             {% if row['elto'] %}<a href="{{ row['elto'] }}" target="_blank" class="mac-link">Ouvrir</a>{% endif %}
                         </td>

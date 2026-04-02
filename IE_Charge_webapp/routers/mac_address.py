@@ -6,6 +6,13 @@ import numpy as np
 import re
 
 from db import query_df, table_exists
+from routers.global_filters import (
+    apply_energy_filter,
+    apply_temperature_filter,
+    apply_warning_binary_filter,
+    enrich_warning_columns,
+)
+from routers.warning_utils import WARNING_DETAILS
 
 router = APIRouter(tags=["mac_address"])
 templates = Jinja2Templates(directory="templates")
@@ -90,6 +97,14 @@ async def search_mac(
     error_types: str = Query(default=""),
     moments: str = Query(default=""),
     mac_query: str = Query(default=""),
+    energy_mode: str = Query(default="all"),
+    energy_min: str = Query(default=""),
+    energy_max: str = Query(default=""),
+    temp_column: str = Query(default=""),
+    temp_mode: str = Query(default="all"),
+    temp_min: str = Query(default=""),
+    temp_max: str = Query(default=""),
+    warning_filter: str = Query(default=""),
 ):
     if not mac_query or len(mac_query.strip()) < 2:
         return templates.TemplateResponse(
@@ -154,6 +169,9 @@ async def search_mac(
     )
 
     df = df[df["mac_norm"].str.contains(mac_norm, na=False)].copy()
+    df = apply_energy_filter(df, energy_mode, energy_min, energy_max)
+    df = apply_temperature_filter(df, temp_column, temp_mode, temp_min, temp_max)
+    df = apply_warning_binary_filter(df, warning_filter)
 
     if df.empty:
         return templates.TemplateResponse(
@@ -175,8 +193,8 @@ async def search_mac(
 
     df["is_ok"] = df["is_ok"].fillna(0).astype(bool)
     if "warning" in df.columns:
-        df["warning"] = pd.to_numeric(df["warning"], errors="coerce").fillna(0).astype(int)
-        df["is_ok"] = df["is_ok"] | df["warning"].eq(1)
+        df = enrich_warning_columns(df)
+        df["is_ok"] = df["is_ok"] | df["has_warning"]
     df["mac_formatted"] = df["mac"].apply(_fmt_mac)
     df["evolution_soc"] = df.apply(
         lambda r: _format_soc_evolution(r.get("SOC Start"), r.get("SOC End")), axis=1
@@ -206,7 +224,7 @@ async def search_mac(
     display_cols = [
         "Site", "PDC", "Datetime start", "Datetime end",
         "evolution_soc", "mac_formatted", "Vehicle", "Energy (Kwh)", "erreur", "elto_link",
-        "warning", "duration"
+            "warning", "warning_codes_list", "warning_details_list", "has_warning", "duration"
     ]
     display_cols = [c for c in display_cols if c in df.columns]
 
@@ -224,6 +242,7 @@ async def search_mac(
             "success_rate": success_rate,
             "ok_rows": ok_rows,
             "nok_rows": nok_rows,
+            "warning_details": WARNING_DETAILS,
         }
     )
 
@@ -301,6 +320,14 @@ async def search_by_codes(
     date_fin: str | None = Form(default=None),
     error_types: str = Form(default=""),
     moments: str = Form(default=""),
+    energy_mode: str = Form(default="all"),
+    energy_min: str = Form(default=""),
+    energy_max: str = Form(default=""),
+    temp_column: str = Form(default=""),
+    temp_mode: str = Form(default="all"),
+    temp_min: str = Form(default=""),
+    temp_max: str = Form(default=""),
+    warning_filter: str = Form(default=""),
 ):
     parts = re.split(r"[,\s;]+", codes.strip())
     try:
@@ -406,8 +433,10 @@ async def search_by_codes(
 
     if "Energy (Kwh)" in df.columns:
         df["Energy (Kwh)"] = pd.to_numeric(df["Energy (Kwh)"], errors="coerce")
-    if "warning" in df.columns:
-        df["warning"] = pd.to_numeric(df["warning"], errors="coerce").fillna(0).astype(int)
+    df = apply_energy_filter(df, energy_mode, energy_min, energy_max)
+    df = apply_temperature_filter(df, temp_column, temp_mode, temp_min, temp_max)
+    df = apply_warning_binary_filter(df, warning_filter)
+    df = enrich_warning_columns(df)
 
     df = df.sort_values("Datetime start", ascending=False)
 
@@ -548,6 +577,7 @@ async def search_by_codes(
             "site_options": site_options,
             "daily_counts": daily_counts.to_dict("records"),
             "hourly_counts": hourly_counts.to_dict("records"),
+            "warning_details": WARNING_DETAILS,
         },
     )
 

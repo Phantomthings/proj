@@ -58,12 +58,13 @@
                     <th class="sortable">MAC</th>
                     <th class="sortable">Véhicule</th>
                     <th class="sortable" data-type="number">Énergie (kWh)</th>
+                    <th class="sortable">Warning</th>
                     <th style="width: 80px;">Lien</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in ok_rows %}
-                <tr{% if row.warning == 1 %} style="background-color: #fefce8;"{% endif %}>
+                <tr{% if row.has_warning %} style="background-color: #fefce8;"{% endif %}>
                     <td>{{ loop.index }}</td>
                     <td>{{ row.Site or '—' }}</td>
                     <td>{{ row.PDC or '—' }}</td>
@@ -75,6 +76,13 @@
                     <td>{{ row.Vehicle or '—' }}</td>
                     <td style="text-align: right;" data-sort-value="{{ row['Energy (Kwh)'] or 0 }}">
                         {% if row['Energy (Kwh)'] %}{{ "%.3f"|format(row['Energy (Kwh)']) }}{% else %}—{% endif %}
+                    </td>
+                    <td data-sort-value="{{ row.warning_codes_list|join(',') }}">
+                        {% if row.has_warning %}
+                        <details><summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ row.warning_codes_list|join(', ') }}</summary>
+                            <div style="font-size:0.8rem; color:#92400e;">{% for d in row.warning_details_list %}<div>{{ d }}</div>{% endfor %}</div>
+                        </details>
+                        {% else %}—{% endif %}
                     </td>
                     <td style="text-align: center;">
                         <a href="{{ row.elto_link }}" target="_blank" class="mac-link">Ouvrir</a>
@@ -107,12 +115,13 @@
                     <th class="sortable">Véhicule</th>
                     <th class="sortable">Erreur</th>
                     <th class="sortable" data-type="number">Énergie (kWh)</th>
+                    <th class="sortable">Warning</th>
                     <th style="width: 80px;">Lien</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in nok_rows %}
-                <tr{% if row.warning == 1 %} style="background-color: #fefce8;"{% endif %}>
+                <tr{% if row.has_warning %} style="background-color: #fefce8;"{% endif %}>
                     <td>{{ loop.index }}</td>
                     <td>{{ row.Site or '—' }}</td>
                     <td>{{ row.PDC or '—' }}</td>
@@ -125,6 +134,13 @@
                     <td style="color: #dc2626; font-weight: 500;">{{ row.erreur or '—' }}</td>
                     <td style="text-align: right;" data-sort-value="{{ row['Energy (Kwh)'] or 0 }}">
                         {% if row['Energy (Kwh)'] %}{{ "%.3f"|format(row['Energy (Kwh)']) }}{% else %}—{% endif %}
+                    </td>
+                    <td data-sort-value="{{ row.warning_codes_list|join(',') }}">
+                        {% if row.has_warning %}
+                        <details><summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ row.warning_codes_list|join(', ') }}</summary>
+                            <div style="font-size:0.8rem; color:#92400e;">{% for d in row.warning_details_list %}<div>{{ d }}</div>{% endfor %}</div>
+                        </details>
+                        {% else %}—{% endif %}
                     </td>
                     <td style="text-align: center;">
                         <a href="{{ row.elto_link }}" target="_blank" class="mac-link">Ouvrir</a>

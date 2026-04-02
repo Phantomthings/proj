@@ -208,6 +208,14 @@
         <input type="hidden" name="date_fin" value="{{ request.query_params.get('date_fin', '') }}">
         <input type="hidden" name="error_types" value="{{ request.query_params.get('error_types', '') }}">
         <input type="hidden" name="moments" value="{{ request.query_params.get('moments', '') }}">
+        <input type="hidden" name="energy_mode" value="{{ request.query_params.get('energy_mode', 'all') }}">
+        <input type="hidden" name="energy_min" value="{{ request.query_params.get('energy_min', '') }}">
+        <input type="hidden" name="energy_max" value="{{ request.query_params.get('energy_max', '') }}">
+        <input type="hidden" name="temp_column" value="{{ request.query_params.get('temp_column', '') }}">
+        <input type="hidden" name="temp_mode" value="{{ request.query_params.get('temp_mode', 'all') }}">
+        <input type="hidden" name="temp_min" value="{{ request.query_params.get('temp_min', '') }}">
+        <input type="hidden" name="temp_max" value="{{ request.query_params.get('temp_max', '') }}">
+        <input type="hidden" name="warning_filter" value="{{ request.query_params.get('warning_filter', 'tous') }}">
 
         <div class="code-input-group">
             <label class="code-label">Code(s) d'erreur</label>
