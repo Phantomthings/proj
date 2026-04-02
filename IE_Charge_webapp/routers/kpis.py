@@ -4,6 +4,13 @@ from datetime import date
 import pandas as pd
 
 from db import query_df, table_exists
+from routers.global_filters import (
+    apply_energy_filter,
+    apply_temperature_filter,
+    apply_warning_binary_filter,
+    enrich_warning_columns,
+)
+from routers.warning_utils import WARNING_DETAILS
 
 router = APIRouter(tags=["kpis"])
 templates = Jinja2Templates(directory="templates")
@@ -16,6 +23,14 @@ async def get_suspicious(
     sites: str = Query(default=""),
     date_debut: date = Query(default=None),
     date_fin: date = Query(default=None),
+    energy_mode: str = Query(default="all"),
+    energy_min: str = Query(default=""),
+    energy_max: str = Query(default=""),
+    temp_column: str = Query(default=""),
+    temp_mode: str = Query(default="all"),
+    temp_min: str = Query(default=""),
+    temp_max: str = Query(default=""),
+    warning_filter: str = Query(default=""),
 ):
     """Transactions suspectes (<1 kWh)"""
     sql = """
@@ -43,6 +58,11 @@ async def get_suspicious(
 
         if "Datetime start" in df.columns:
             df = df.sort_values("Datetime start")
+
+        df = apply_energy_filter(df, energy_mode, energy_min, energy_max)
+        df = apply_temperature_filter(df, temp_column, temp_mode, temp_min, temp_max)
+        df = apply_warning_binary_filter(df, warning_filter)
+        df = enrich_warning_columns(df)
 
     def format_ts(value):
         if pd.isna(value):
@@ -84,7 +104,10 @@ async def get_suspicious(
                     "energy": to_float(row.get("Energy (Kwh)")),
                     "soc_start": to_float(row.get("SOC Start")),
                     "soc_end": to_float(row.get("SOC End")),
-                    "warning": 1 if pd.notna(row.get("warning")) and int(row.get("warning", 0)) == 1 else 0,
+                    "warning": row.get("warning", ""),
+                    "warning_codes_list": row.get("warning_codes_list", []),
+                    "warning_details_list": row.get("warning_details_list", []),
+                    "has_warning": bool(row.get("has_warning", False)),
                     "duration": to_float(row.get("duration")),
                 }
             )
@@ -94,6 +117,7 @@ async def get_suspicious(
         {
             "request": request,
             "rows": rows,
+            "warning_details": WARNING_DETAILS,
         },
     )
 

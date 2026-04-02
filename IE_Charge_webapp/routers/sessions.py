@@ -8,6 +8,13 @@ import numpy as np
 
 from db import query_df
 from routers.filters import MOMENT_ORDER
+from routers.global_filters import (
+    apply_energy_filter,
+    apply_temperature_filter,
+    apply_warning_binary_filter,
+    enrich_warning_columns,
+)
+from routers.warning_utils import parse_warning_codes, WARNING_DETAILS
 
 EVI_MOMENT = "EVI Status during error"
 EVI_CODE = "EVI Error Code"
@@ -63,7 +70,7 @@ def _build_conditions(sites: str, date_debut: date | None, date_fin: date | None
 def _apply_status_filters(df: pd.DataFrame, error_type_list: list[str], moment_list: list[str]) -> pd.DataFrame:
     df["is_ok"] = pd.to_numeric(df["state"], errors="coerce").fillna(0).astype(int).eq(0)
     if "warning" in df.columns:
-        df["is_warning"] = pd.to_numeric(df["warning"], errors="coerce").fillna(0).astype(int).eq(1)
+        df["is_warning"] = df["warning"].apply(lambda value: len(parse_warning_codes(value)) > 0)
         df["is_ok"] = df["is_ok"] | df["is_warning"]
     else:
         df["is_warning"] = False
@@ -1896,7 +1903,12 @@ def _format_soc(s0, s1):
 
 
 def _prepare_query_params(request: Request) -> str:
-    allowed = {"sites", "date_debut", "date_fin", "error_types", "moments"}
+    allowed = {
+        "sites", "date_debut", "date_fin", "error_types", "moments",
+        "energy_mode", "energy_min", "energy_max",
+        "temp_column", "temp_mode", "temp_min", "temp_max",
+        "warning_filter",
+    }
     data = {k: v for k, v in request.query_params.items() if k in allowed and v}
     return urlencode(data)
 
@@ -1909,6 +1921,14 @@ async def get_sessions_site_details(
     date_fin: date = Query(default=None),
     error_types: str = Query(default=""),
     moments: str = Query(default=""),
+    energy_mode: str = Query(default="all"),
+    energy_min: str = Query(default=""),
+    energy_max: str = Query(default=""),
+    temp_column: str = Query(default=""),
+    temp_mode: str = Query(default="all"),
+    temp_min: str = Query(default=""),
+    temp_max: str = Query(default=""),
+    warning_filter: str = Query(default=""),
     site_focus: str = Query(default=""),
     pdc: str = Query(default=""),
 ):
@@ -1942,6 +1962,11 @@ async def get_sessions_site_details(
     """
 
     df = query_df(sql, params)
+    if not df.empty:
+        df = apply_energy_filter(df, energy_mode, energy_min, energy_max)
+        df = apply_temperature_filter(df, temp_column, temp_mode, temp_min, temp_max)
+        df = apply_warning_binary_filter(df, warning_filter)
+        df = enrich_warning_columns(df)
 
     if df.empty:
         return templates.TemplateResponse(
@@ -1959,8 +1984,7 @@ async def get_sessions_site_details(
     df["PDC"] = df["PDC"].astype(str)
     df["is_ok"] = pd.to_numeric(df["state"], errors="coerce").fillna(0).astype(int).eq(0)
     if "warning" in df.columns:
-        df["warning"] = pd.to_numeric(df["warning"], errors="coerce").fillna(0).astype(int)
-        df["is_warning"] = df["warning"].eq(1)
+        df["is_warning"] = df["has_warning"]
         df["is_ok"] = df["is_ok"] | df["is_warning"]
 
     mask_type = df["type_erreur"].isin(error_type_list) if error_type_list and "type_erreur" in df.columns else True
@@ -2030,6 +2054,9 @@ async def get_sessions_site_details(
         "evolution_soc",
         "elto",
         "warning",
+        "warning_codes_list",
+        "warning_details_list",
+        "has_warning",
         "duration",
     ]
     err_table = err_rows[err_display_cols].copy() if not err_rows.empty else pd.DataFrame(columns=err_display_cols)
@@ -2050,6 +2077,9 @@ async def get_sessions_site_details(
         "evolution_soc",
         "elto",
         "warning",
+        "warning_codes_list",
+        "warning_details_list",
+        "has_warning",
         "duration",
     ]
     ok_table = ok_rows[ok_display_cols].copy() if not ok_rows.empty else pd.DataFrame(columns=ok_display_cols)
@@ -2235,5 +2265,6 @@ async def get_sessions_site_details(
             "evi_occ": evi_occ,
             "evi_occ_moments": evi_occ_moments,
             "base_query": _prepare_query_params(request),
+            "warning_details": WARNING_DETAILS,
         },
     )

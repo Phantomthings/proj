@@ -688,7 +688,53 @@
                 <span><strong>Période:</strong> <span id="sum-dates">--</span></span>
                 <span><strong>Sites:</strong> <span id="sum-sites">--</span></span>
             </div>
-            
+
+            <div class="filter-row" style="align-items:flex-end;">
+                <div>
+                    <div class="filter-label">Énergie (kWh)</div>
+                    <select class="select-input" id="energy-mode" onchange="onGlobalFiltersChange()">
+                        <option value="all">Tous</option>
+                        <option value="lt">≤ valeur</option>
+                        <option value="gt">≥ valeur</option>
+                        <option value="between">Intervalle</option>
+                    </select>
+                </div>
+                <div><input type="number" class="select-input" id="energy-min" placeholder="Min" step="0.001" onchange="onGlobalFiltersChange()"></div>
+                <div><input type="number" class="select-input" id="energy-max" placeholder="Max" step="0.001" onchange="onGlobalFiltersChange()"></div>
+            </div>
+
+            <div class="filter-row" style="align-items:flex-end;">
+                <div>
+                    <div class="filter-label">Température</div>
+                    <select class="select-input" id="temp-column" onchange="onGlobalFiltersChange()">
+                        <option value="">-- Colonne --</option>
+                        <option value="DCBM_Temp_H_Min">DCBM_Temp_H_Min</option><option value="DCBM_Temp_H_Max">DCBM_Temp_H_Max</option><option value="DCBM_Temp_H_Moy">DCBM_Temp_H_Moy</option>
+                        <option value="DCBM_Temp_L_Min">DCBM_Temp_L_Min</option><option value="DCBM_Temp_L_Max">DCBM_Temp_L_Max</option><option value="DCBM_Temp_L_Moy">DCBM_Temp_L_Moy</option>
+                        <option value="PISTOLET_Temp_1_Min">PISTOLET_Temp_1_Min</option><option value="PISTOLET_Temp_1_Max">PISTOLET_Temp_1_Max</option><option value="PISTOLET_Temp_1_Moy">PISTOLET_Temp_1_Moy</option>
+                        <option value="PISTOLET_Temp_2_Min">PISTOLET_Temp_2_Min</option><option value="PISTOLET_Temp_2_Max">PISTOLET_Temp_2_Max</option><option value="PISTOLET_Temp_2_Moy">PISTOLET_Temp_2_Moy</option>
+                        <option value="DCBM_Temp_Moy_Diff">DCBM_Temp_Moy_Diff</option><option value="PISTOLET_Temp_Moy_Diff">PISTOLET_Temp_Moy_Diff</option><option value="DCBM_PISTOLET_Moy_Diff">DCBM_PISTOLET_Moy_Diff</option>
+                    </select>
+                </div>
+                <div>
+                    <select class="select-input" id="temp-mode" onchange="onGlobalFiltersChange()">
+                        <option value="all">Tous</option><option value="lt">≤ valeur</option><option value="gt">≥ valeur</option><option value="between">Intervalle</option>
+                    </select>
+                </div>
+                <div><input type="number" class="select-input" id="temp-min" placeholder="Min °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
+                <div><input type="number" class="select-input" id="temp-max" placeholder="Max °C" step="0.1" onchange="onGlobalFiltersChange()"></div>
+            </div>
+
+            <div class="filter-row">
+                <div>
+                    <div class="filter-label">Warning</div>
+                    <select class="select-input" id="warning-filter" onchange="onGlobalFiltersChange()">
+                        <option value="tous">Tous</option>
+                        <option value="avec">Avec warning</option>
+                        <option value="sans">Sans warning</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Error filters -->
             <div class="filter-row-errors">
                 <div>
@@ -756,6 +802,14 @@
             selectedErrorTypes: [],
             moments: [],
             selectedMoments: [],
+            energyMode: 'all',
+            energyMin: '',
+            energyMax: '',
+            tempColumn: '',
+            tempMode: 'all',
+            tempMin: '',
+            tempMax: '',
+            warningFilter: 'tous',
             siteFocus: '',
             siteDetailsPdcs: [],
             macSearchState: null,
@@ -999,6 +1053,18 @@
             refreshTab();
         }
 
+        function onGlobalFiltersChange() {
+            state.energyMode = document.getElementById('energy-mode')?.value || 'all';
+            state.energyMin = document.getElementById('energy-min')?.value || '';
+            state.energyMax = document.getElementById('energy-max')?.value || '';
+            state.tempColumn = document.getElementById('temp-column')?.value || '';
+            state.tempMode = document.getElementById('temp-mode')?.value || 'all';
+            state.tempMin = document.getElementById('temp-min')?.value || '';
+            state.tempMax = document.getElementById('temp-max')?.value || '';
+            state.warningFilter = document.getElementById('warning-filter')?.value || 'tous';
+            refreshTab();
+        }
+
         // Tabs
         function buildUrl(base) {
             const p = new URLSearchParams();
@@ -1018,6 +1084,14 @@
             if (state.dateFin) p.set('date_fin', state.dateFin);
             if (state.selectedErrorTypes.length < state.errorTypes.length) p.set('error_types', state.selectedErrorTypes.join(','));
             if (state.selectedMoments.length < state.moments.length) p.set('moments', state.selectedMoments.join(','));
+            if (state.energyMode && state.energyMode !== 'all') p.set('energy_mode', state.energyMode);
+            if (state.energyMin) p.set('energy_min', state.energyMin);
+            if (state.energyMax) p.set('energy_max', state.energyMax);
+            if (state.tempColumn) p.set('temp_column', state.tempColumn);
+            if (state.tempMode && state.tempMode !== 'all') p.set('temp_mode', state.tempMode);
+            if (state.tempMin) p.set('temp_min', state.tempMin);
+            if (state.tempMax) p.set('temp_max', state.tempMax);
+            if (state.warningFilter && state.warningFilter !== 'tous') p.set('warning_filter', state.warningFilter);
             return p.toString() ? `${base}?${p}` : base;
         }
 

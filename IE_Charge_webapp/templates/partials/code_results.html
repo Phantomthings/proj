@@ -35,12 +35,13 @@
                     <th class="sortable">Erreur</th>
                     <th class="sortable">SOC</th>
                     <th class="sortable" data-type="number">Énergie (kWh)</th>
+                    <th class="sortable">Warning</th>
                     <th style="width: 80px;">Lien</th>
                 </tr>
             </thead>
             <tbody>
                 {% for charge in charges %}
-                <tr{% if charge.warning == 1 %} style="background-color: #fefce8;"{% endif %}>
+                <tr{% if charge.has_warning %} style="background-color: #fefce8;"{% endif %}>
                     <td>{{ loop.index }}</td>
                     <td>{{ charge.Site }}</td>
                     <td>{{ charge.PDC }}</td>
@@ -53,6 +54,13 @@
                     <td>{{ charge['Évolution SOC'] or '—' }}</td>
                     <td style="text-align: right;" data-sort-value="{{ charge['Energy (Kwh)'] or 0 }}">
                         {% if charge['Energy (Kwh)'] %}{{ "%.3f"|format(charge['Energy (Kwh)']) }}{% else %}—{% endif %}
+                    </td>
+                    <td data-sort-value="{{ charge.warning_codes_list|join(',') }}">
+                        {% if charge.has_warning %}
+                        <details><summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ charge.warning_codes_list|join(', ') }}</summary>
+                            <div style="font-size:0.8rem; color:#92400e;">{% for d in charge.warning_details_list %}<div>{{ d }}</div>{% endfor %}</div>
+                        </details>
+                        {% else %}—{% endif %}
                     </td>
                     <td style="text-align: center;">
                         <a href="{{ base_url }}{{ charge.ID }}" target="_blank" class="mac-link">Ouvrir</a>

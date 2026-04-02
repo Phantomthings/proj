@@ -114,13 +114,14 @@
                     <th data-sortable="true">Fin</th>
                     <th data-sortable="true" data-type="number">Durée (min)</th>
                     <th data-sortable="true" data-type="number">Énergie (kWh)</th>
+                    <th data-sortable="true">Warning</th>
                     <th data-sortable="true" data-type="number">SOC début</th>
                     <th data-sortable="true" data-type="number">SOC fin</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in rows %}
-                <tr{% if row.warning == 1 %} style="background-color: #fefce8;"{% endif %}>
+                <tr{% if row.has_warning %} style="background-color: #fefce8;"{% endif %}>
                     <td class="muted-text" data-sort-value="{{ row.rank }}">{{ row.rank }}</td>
                     <td class="link-cell">
                         {% if row.id %}
@@ -137,6 +138,16 @@
                     <td data-sort-value="{{ row.end }}">{{ row.end }}</td>
                     <td data-sort-value="{{ row.duration }}">{{ row.duration if row.duration else '—' }}</td>
                     <td data-sort-value="{{ row.energy }}">{{ row.energy }}</td>
+                    <td data-sort-value="{{ row.warning_codes_list|join(',') }}">
+                        {% if row.has_warning %}
+                        <details>
+                            <summary style="cursor:pointer; color:#d97706; font-weight:700;">🟠 {{ row.warning_codes_list|join(', ') }}</summary>
+                            <div style="font-size:0.8rem; color:#92400e;">
+                                {% for detail in row.warning_details_list %}<div>{{ detail }}</div>{% endfor %}
+                            </div>
+                        </details>
+                        {% else %}—{% endif %}
+                    </td>
                     <td data-sort-value="{{ row.soc_start }}">{{ row.soc_start }}</td>
                     <td data-sort-value="{{ row.soc_end }}">{{ row.soc_end }}</td>
                 </tr>
